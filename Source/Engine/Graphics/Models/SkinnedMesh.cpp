@@ -4,10 +4,13 @@
 #include "ModelInstanceEntry.h"
 #include "Engine/Content/Assets/Material.h"
 #include "Engine/Content/Assets/SkinnedModel.h"
+#include "Engine/Graphics/GPUDevice.h"
+#include "Engine/Graphics/RenderTask.h"
 #include "Engine/Level/Scene/Scene.h"
 #include "Engine/Renderer/RenderList.h"
 #include "Engine/Serialization/MemoryReadStream.h"
 #include "Engine/Profiler/ProfilerCPU.h"
+#include "Engine/Threading/Threading.h"
 #include <ThirdParty/mono-2.0/mono/metadata/appdomain.h>
 
 void SkinnedMesh::Init(SkinnedModel* model, int32 lodIndex, int32 index, int32 materialSlotIndex, const BoundingBox& box, const BoundingSphere& sphere)
@@ -32,17 +35,6 @@ SkinnedMesh::~SkinnedMesh()
 {
     SAFE_DELETE_GPU_RESOURCE(_vertexBuffer);
     SAFE_DELETE_GPU_RESOURCE(_indexBuffer);
-}
-
-void SkinnedMesh::SetMaterialSlotIndex(int32 value)
-{
-    if (value < 0 || value >= _model->MaterialSlots.Count())
-    {
-        LOG(Warning, "Cannot set mesh material slot to {0} while model has {1} slots.", value, _model->MaterialSlots.Count());
-        return;
-    }
-
-    _materialSlotIndex = value;
 }
 
 bool SkinnedMesh::Load(uint32 vertices, uint32 triangles, void* vb0, void* ib, bool use16BitIndexBuffer)
@@ -101,6 +93,8 @@ void SkinnedMesh::Unload()
 
 bool SkinnedMesh::UpdateMesh(uint32 vertexCount, uint32 triangleCount, VB0SkinnedElementType* vb, void* ib, bool use16BitIndices)
 {
+    auto model = (SkinnedModel*)_model;
+
     // Setup GPU resources
     const bool failed = Load(vertexCount, triangleCount, vb, ib, use16BitIndices);
     if (!failed)
@@ -109,7 +103,7 @@ bool SkinnedMesh::UpdateMesh(uint32 vertexCount, uint32 triangleCount, VB0Skinne
         SetBounds(BoundingBox::FromPoints((Vector3*)vb, vertexCount));
 
         // Send event (actors using this model can update bounds, etc.)
-        _model->onLoaded();
+        model->onLoaded();
     }
 
     return failed;
@@ -218,7 +212,7 @@ bool SkinnedMesh::DownloadDataGPU(MeshBufferType type, BytesContainer& result) c
     return buffer && buffer->DownloadData(result);
 }
 
-Task* SkinnedMesh::DownloadDataAsyncGPU(MeshBufferType type, BytesContainer& result) const
+Task* SkinnedMesh::DownloadDataGPUAsync(MeshBufferType type, BytesContainer& result) const
 {
     GPUBuffer* buffer = nullptr;
     switch (type)
@@ -535,7 +529,7 @@ bool SkinnedMesh::DownloadBuffer(bool forceGpu, MonoArray* resultObj, int32 type
     {
         // Get data from GPU
         // TODO: support reusing the input memory buffer to perform a single copy from staging buffer to the input CPU buffer
-        auto task = mesh->DownloadDataAsyncGPU(bufferType, data);
+        auto task = mesh->DownloadDataGPUAsync(bufferType, data);
         if (task == nullptr)
             return true;
         task->Start();

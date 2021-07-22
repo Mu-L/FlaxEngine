@@ -31,6 +31,11 @@ Collider::Collider(const SpawnParams& params)
     Material.Changed.Bind<Collider, &Collider::OnMaterialChanged>(this);
 }
 
+PxShape* Collider::GetPxShape() const
+{
+    return _shape;
+}
+
 void Collider::SetIsTrigger(bool value)
 {
     if (value == _isTrigger || !CanBeTrigger())
@@ -170,19 +175,7 @@ bool Collider::ComputePenetration(const Collider* colliderA, const Collider* col
     const PxTransform poseA(C2P(colliderA->GetPosition()), C2P(colliderA->GetOrientation()));
     const PxTransform poseB(C2P(colliderB->GetPosition()), C2P(colliderB->GetOrientation()));
 
-    return PxGeometryQuery::computePenetration(
-        C2P(direction),
-        distance,
-        shapeA->getGeometry().any(),
-        poseA,
-        shapeB->getGeometry().any(),
-        poseB
-    );
-}
-
-bool Collider::IsAttached() const
-{
-    return _shape && _shape->getActor() != nullptr;
+    return PxGeometryQuery::computePenetration(C2P(direction), distance, shapeA->getGeometry().any(), poseA, shapeB->getGeometry().any(), poseB);
 }
 
 bool Collider::CanAttach(RigidBody* rigidBody) const
@@ -240,19 +233,11 @@ void Collider::Attach(RigidBody* rigidBody)
 
     // Attach
     rigidBody->GetPhysXRigidActor()->attachShape(*_shape);
-    _shape->setLocalPose(PxTransform(C2P((_localTransform.Translation + _localTransform.Orientation * _center) * rigidBody->GetScale()), C2P(_localTransform.Orientation)));
+    _cachedLocalPosePos = (_localTransform.Translation + _localTransform.Orientation * _center) * rigidBody->GetScale();
+    _cachedLocalPoseRot = _localTransform.Orientation;
+    _shape->setLocalPose(PxTransform(C2P(_cachedLocalPosePos), C2P(_cachedLocalPoseRot)));
     if (rigidBody->IsDuringPlay())
         rigidBody->UpdateBounds();
-}
-
-void Collider::UpdateScale()
-{
-    const Vector3 scale = GetScale();
-    if (Vector3::NearEqual(_cachedScale, scale))
-        return;
-
-    // Recreate shape geometry
-    UpdateGeometry();
 }
 
 void Collider::UpdateLayerBits()
@@ -350,6 +335,9 @@ void Collider::CreateStaticActor()
     _staticActor = CPhysX->createRigidStatic(trans);
     ASSERT(_staticActor);
     _staticActor->userData = this;
+#if WITH_PVD
+    _staticActor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
+#endif
 
     // Reset local pos of the shape and link it to the actor
     _shape->setLocalPose(PxTransform(C2P(_center)));
@@ -439,15 +427,18 @@ void Collider::BeginPlay(SceneBeginData* data)
 
 void Collider::EndPlay()
 {
+    // Base
+    PhysicsColliderActor::EndPlay();
+
     if (_shape)
     {
         // Detach from the actor
         auto actor = _shape->getActor();
         if (actor)
             actor->detachShape(*_shape);
-
-        // Check if was using a static actor and cleanup it
-        if (_staticActor)
+        if (actor && actor->is<PxRigidDynamic>())
+            static_cast<RigidBody*>(actor->userData)->OnColliderChanged(this);
+        else if (_staticActor)
         {
             RemoveStaticActor();
         }
@@ -457,9 +448,6 @@ void Collider::EndPlay()
         _shape->release();
         _shape = nullptr;
     }
-
-    // Base
-    PhysicsColliderActor::EndPlay();
 }
 
 void Collider::OnActiveInTreeChanged()
@@ -476,11 +464,7 @@ void Collider::OnActiveInTreeChanged()
         auto rigidBody = GetAttachedRigidBody();
         if (rigidBody)
         {
-            rigidBody->UpdateMass();
-
-            // TODO: maybe wake up only if one ore more shapes attached is active?
-            //if (rigidBody->GetStartAwake())
-            //	rigidBody->WakeUp();
+            rigidBody->OnColliderChanged(this);
         }
     }
 }
@@ -497,6 +481,8 @@ void Collider::OnParentChanged()
         auto actor = _shape->getActor();
         if (actor)
             actor->detachShape(*_shape);
+        if (actor && actor->is<PxRigidDynamic>())
+            static_cast<RigidBody*>(actor->userData)->OnColliderChanged(this);
 
         // Check if the new parent is a rigidbody
         const auto rigidBody = dynamic_cast<RigidBody*>(GetParent());
@@ -525,10 +511,18 @@ void Collider::OnTransformChanged()
     }
     else if (const RigidBody* rigidBody = GetAttachedRigidBody())
     {
-        _shape->setLocalPose(PxTransform(C2P((_localTransform.Translation + _localTransform.Orientation * _center) * rigidBody->GetScale()), C2P(_localTransform.Orientation)));
+        const Vector3 localPosePos = (_localTransform.Translation + _localTransform.Orientation * _center) * rigidBody->GetScale();
+        if (_cachedLocalPosePos != localPosePos || _cachedLocalPoseRot != _localTransform.Orientation)
+        {
+            _cachedLocalPosePos = localPosePos;
+            _cachedLocalPoseRot = _localTransform.Orientation;
+            _shape->setLocalPose(PxTransform(C2P(localPosePos), C2P(_cachedLocalPoseRot)));
+        }
     }
 
-    UpdateScale();
+    const Vector3 scale = GetScale();
+    if (!Vector3::NearEqual(_cachedScale, scale))
+        UpdateGeometry();
     UpdateBounds();
 }
 

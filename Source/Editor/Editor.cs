@@ -46,6 +46,7 @@ namespace FlaxEditor
         private bool _isAfterInit, _areModulesInited, _areModulesAfterInitEnd, _isHeadlessMode;
         private string _projectToOpen;
         private float _lastAutoSaveTimer;
+        private Guid _startupSceneCmdLine;
 
         private const string ProjectDataLastScene = "LastScene";
         private const string ProjectDataLastSceneSpawn = "LastSceneSpawn";
@@ -220,7 +221,7 @@ namespace FlaxEditor
             GameProject = ProjectInfo.Load(Internal_GetProjectPath());
 
             Icons = new EditorIcons();
-            Icons.GetIcons();
+            Icons.LoadIcons();
 
             // Create common editor modules
             RegisterModule(Options = new OptionsModule(this));
@@ -271,10 +272,11 @@ namespace FlaxEditor
                 module.OnEndInit();
         }
 
-        internal void Init(bool isHeadless, bool skipCompile)
+        internal void Init(bool isHeadless, bool skipCompile, Guid startupScene)
         {
             EnsureState<LoadingState>();
             _isHeadlessMode = isHeadless;
+            _startupSceneCmdLine = startupScene;
             Log("Editor init");
             if (isHeadless)
                 Log("Running in headless mode");
@@ -289,6 +291,30 @@ namespace FlaxEditor
                 _modules[i].OnInit();
             }
             _areModulesInited = true;
+
+            // Preload initial scene asset
+            {
+                var startupSceneMode = Options.Options.General.StartupSceneMode;
+                if (startupSceneMode == GeneralOptions.StartupSceneModes.LastOpened && !ProjectCache.HasCustomData(ProjectDataLastScene))
+                    startupSceneMode = GeneralOptions.StartupSceneModes.ProjectDefault;
+                switch (startupSceneMode)
+                {
+                case GeneralOptions.StartupSceneModes.ProjectDefault:
+                {
+                    if (string.IsNullOrEmpty(GameProject.DefaultScene))
+                        break;
+                    JsonSerializer.ParseID(GameProject.DefaultScene, out var defaultSceneId);
+                    Internal_LoadAsset(ref defaultSceneId);
+                    break;
+                }
+                case GeneralOptions.StartupSceneModes.LastOpened:
+                {
+                    if (ProjectCache.TryGetCustomData(ProjectDataLastScene, out var lastSceneIdName) && Guid.TryParse(lastSceneIdName, out var lastSceneId))
+                        Internal_LoadAsset(ref lastSceneId);
+                    break;
+                }
+                }
+            }
 
             InitializationStart?.Invoke();
 
@@ -332,6 +358,17 @@ namespace FlaxEditor
             }
 
             // Load scene
+
+            // scene cmd line argument
+            var scene = ContentDatabase.Find(_startupSceneCmdLine);
+            if (scene is SceneItem)
+            {
+                Editor.Log("Loading scene specified in command line");
+                Scene.OpenScene(_startupSceneCmdLine);
+                return;
+            }
+
+            // if no scene cmd line argument is provided
             var startupSceneMode = Options.Options.General.StartupSceneMode;
             if (startupSceneMode == GeneralOptions.StartupSceneModes.LastOpened && !ProjectCache.HasCustomData(ProjectDataLastScene))
             {
@@ -752,10 +789,11 @@ namespace FlaxEditor
         /// <param name="type">The collision data type.</param>
         /// <param name="model">The source model.</param>
         /// <param name="modelLodIndex">The source model LOD index.</param>
+        /// <param name="materialSlotsMask">The source model material slots mask. One bit per-slot. Can be sued to exclude particular material slots from collision cooking.</param>
         /// <param name="convexFlags">The convex mesh generation flags.</param>
         /// <param name="convexVertexLimit">The convex mesh vertex limit. Use values in range [8;255]</param>
         /// <returns>True if failed, otherwise false.</returns>
-        public static bool CookMeshCollision(string path, CollisionDataType type, Model model, int modelLodIndex = 0, ConvexMeshGenerationFlags convexFlags = ConvexMeshGenerationFlags.None, int convexVertexLimit = 255)
+        public static bool CookMeshCollision(string path, CollisionDataType type, ModelBase model, int modelLodIndex = 0, uint materialSlotsMask = uint.MaxValue, ConvexMeshGenerationFlags convexFlags = ConvexMeshGenerationFlags.None, int convexVertexLimit = 255)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException(nameof(path));
@@ -764,7 +802,7 @@ namespace FlaxEditor
             if (type == CollisionDataType.None)
                 throw new ArgumentException(nameof(type));
 
-            return Internal_CookMeshCollision(path, type, FlaxEngine.Object.GetUnmanagedPtr(model), modelLodIndex, convexFlags, convexVertexLimit);
+            return Internal_CookMeshCollision(path, type, FlaxEngine.Object.GetUnmanagedPtr(model), modelLodIndex, materialSlotsMask, convexFlags, convexVertexLimit);
         }
 
         /// <summary>
@@ -877,10 +915,12 @@ namespace FlaxEditor
         /// Checks if can import asset with the given extension.
         /// </summary>
         /// <param name="extension">The file extension.</param>
+        /// <param name="outputExtension">The output file extension (flax, json, etc.).</param>
         /// <returns>True if can import files with given extension, otherwise false.</returns>
-        public static bool CanImport(string extension)
+        public static bool CanImport(string extension, out string outputExtension)
         {
-            return Internal_CanImport(extension);
+            outputExtension = Internal_CanImport(extension);
+            return outputExtension != null;
         }
 
         /// <summary>
@@ -1182,6 +1222,8 @@ namespace FlaxEditor
                 var win = Windows.GameWin.Root;
                 if (win?.RootWindow is WindowRootControl root && root.Window && root.Window.IsFocused)
                 {
+                    if (StateMachine.IsPlayMode && StateMachine.PlayingState.IsPaused)
+                        return false;
                     return true;
                 }
             }
@@ -1288,20 +1330,17 @@ namespace FlaxEditor
             VisualScriptingDebugFlow?.Invoke(debugFlow);
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct AnimGraphDebugFlowInfo
+        private static void RequestStartPlayOnEditMode()
         {
-            public Asset Asset;
-            public FlaxEngine.Object Object;
-            public uint NodeId;
-            public int BoxId;
+            if (Instance.StateMachine.IsEditMode)
+                Instance.Simulation.RequestStartPlay();
+            if (Instance.StateMachine.IsPlayMode)
+                Instance.StateMachine.StateChanged -= RequestStartPlayOnEditMode;
         }
 
-        internal static event Action<AnimGraphDebugFlowInfo> AnimGraphDebugFlow;
-
-        internal static void Internal_OnAnimGraphDebugFlow(ref AnimGraphDebugFlowInfo debugFlow)
+        internal static void Internal_RequestStartPlayOnEditMode()
         {
-            AnimGraphDebugFlow?.Invoke(debugFlow);
+            Instance.StateMachine.StateChanged += RequestStartPlayOnEditMode;
         }
 
         [MethodImpl(MethodImplOptions.InternalCall)]
@@ -1344,7 +1383,7 @@ namespace FlaxEditor
         internal static extern string Internal_GetShaderAssetSourceCode(IntPtr obj);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern bool Internal_CookMeshCollision(string path, CollisionDataType type, IntPtr model, int modelLodIndex, ConvexMeshGenerationFlags convexFlags, int convexVertexLimit);
+        internal static extern bool Internal_CookMeshCollision(string path, CollisionDataType type, IntPtr model, int modelLodIndex, uint materialSlotsMask, ConvexMeshGenerationFlags convexFlags, int convexVertexLimit);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
         internal static extern void Internal_GetCollisionWires(IntPtr collisionData, out Vector3[] triangles, out int[] indices);
@@ -1368,7 +1407,7 @@ namespace FlaxEditor
         internal static extern bool Internal_CreateVisualScript(string outputPath, string baseTypename);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern bool Internal_CanImport(string extension);
+        internal static extern string Internal_CanImport(string extension);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
         internal static extern bool Internal_CanExport(string path);
@@ -1402,6 +1441,12 @@ namespace FlaxEditor
 
         [MethodImpl(MethodImplOptions.InternalCall)]
         internal static extern void Internal_DeserializeSceneObject(IntPtr sceneObject, string json);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void Internal_LoadAsset(ref Guid id);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern bool Internal_CanSetToRoot(IntPtr prefab, IntPtr newRoot);
 
         #endregion
     }

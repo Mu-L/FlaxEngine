@@ -7,6 +7,7 @@
 #include "Engine/Core/Config/GameSettings.h"
 #include "Engine/Renderer/ReflectionsPass.h"
 #include "Engine/Renderer/AntiAliasing/SMAA.h"
+#include "Engine/Engine/Globals.h"
 
 bool DeployDataStep::Perform(CookingData& data)
 {
@@ -15,7 +16,7 @@ bool DeployDataStep::Perform(CookingData& data)
     const auto gameSettings = GameSettings::Get();
 
     // Setup output folders and copy required data
-    const auto contentDir = data.OutputPath / TEXT("Content");
+    const auto contentDir = data.DataOutputPath / TEXT("Content");
     if (FileSystem::DirectoryExists(contentDir))
     {
         // Remove old content files
@@ -26,7 +27,7 @@ bool DeployDataStep::Perform(CookingData& data)
     }
     FileSystem::CreateDirectory(contentDir);
     const auto srcMono = depsRoot / TEXT("Mono");
-    const auto dstMono = data.OutputPath / TEXT("Mono");
+    const auto dstMono = data.DataOutputPath / TEXT("Mono");
     if (!FileSystem::DirectoryExists(dstMono))
     {
         if (!FileSystem::DirectoryExists(srcMono))
@@ -99,6 +100,10 @@ bool DeployDataStep::Perform(CookingData& data)
     data.AddRootEngineAsset(SMAA_SEARCH_TEX);
     if (data.Configuration != BuildConfiguration::Release)
         data.AddRootEngineAsset(TEXT("Editor/Fonts/Roboto-Regular"));
+
+    // Register custom assets (eg. plugins)
+    data.StepProgress(TEXT("Deploying custom data"), 30);
+    GameCooker::OnCollectAssets(data.RootAssets);
 
     // Register game assets
     data.StepProgress(TEXT("Deploying game data"), 50);

@@ -68,7 +68,9 @@ public:
     Guid Input;
     Guid Graphics;
     Guid Navigation;
+    Guid Localization;
     Guid GameCooking;
+    Guid Streaming;
 
     // Per-platform settings containers
     Guid WindowsPlatform;
@@ -77,6 +79,7 @@ public:
     Guid PS4Platform;
     Guid XboxScarlettPlatform;
     Guid AndroidPlatform;
+    Guid SwitchPlatform;
 
 public:
 

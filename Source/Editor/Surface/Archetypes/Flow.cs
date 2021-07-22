@@ -177,7 +177,7 @@ namespace FlaxEditor.Surface.Archetypes
                         {
                             int* dataValues = (int*)dataPtr;
                             for (int i = 0; i < entries.Count; i++)
-                                dataValues[i] = entries[i].Value;
+                                dataValues[i] = (int)entries[i].Value;
                         }
                     }
                     else
@@ -291,6 +291,21 @@ namespace FlaxEditor.Surface.Archetypes
                 {
                     NodeElementArchetype.Factory.Input(0, string.Empty, false, typeof(void), 0),
                     NodeElementArchetype.Factory.Input(1, "Value", true, null, 1),
+                }
+            },
+            new NodeArchetype
+            {
+                TypeID = 6,
+                Title = "Delay",
+                Description = "Delays the graph execution. If delay is 0 then it will pass though.",
+                Flags = NodeFlags.VisualScriptGraph,
+                Size = new Vector2(150, 40),
+                DefaultValues = new object[] { 1.0f },
+                Elements = new[]
+                {
+                    NodeElementArchetype.Factory.Input(0, string.Empty, true, typeof(void), 0),
+                    NodeElementArchetype.Factory.Input(1, "Duration", true, typeof(float), 1, 0),
+                    NodeElementArchetype.Factory.Output(0, string.Empty, typeof(void), 2, true),
                 }
             },
         };

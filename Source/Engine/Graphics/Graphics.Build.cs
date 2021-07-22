@@ -32,8 +32,8 @@ public abstract class GraphicsDeviceBaseModule : EngineModule
 /// </summary>
 public class Graphics : EngineModule
 {
-    private static bool _lodMissingVulkanSDK;
-    private static bool _lodMissingWindowsSDK;
+    private static bool _logMissingVulkanSDK;
+    private static bool _logMissingWindowsSDK;
 
     /// <inheritdoc />
     public override void Setup(BuildOptions options)
@@ -48,12 +48,12 @@ public class Graphics : EngineModule
             if (VulkanSdk.Instance.IsValid)
                 options.PrivateDependencies.Add("GraphicsDeviceVulkan");
             else
-                Log.WarningOnce("Building for Windows without Vulkan rendering backend (Vulkan SDK is missing)", ref _lodMissingVulkanSDK);
+                Log.WarningOnce("Building for Windows without Vulkan rendering backend (Vulkan SDK is missing)", ref _logMissingVulkanSDK);
             var windowsToolchain = options.Toolchain as Flax.Build.Platforms.WindowsToolchain;
             if (windowsToolchain != null && windowsToolchain.SDK != Flax.Build.Platforms.WindowsPlatformSDK.v8_1)
                 options.PrivateDependencies.Add("GraphicsDeviceDX12");
             else
-                Log.WarningOnce("Building for Windows without DirectX 12 rendering backend (Windows 10 SDK is required)", ref _lodMissingWindowsSDK);
+                Log.WarningOnce("Building for Windows without DirectX 12 rendering backend (Windows 10 SDK is required)", ref _logMissingWindowsSDK);
             break;
         case TargetPlatform.XboxOne:
         case TargetPlatform.UWP:
@@ -67,12 +67,15 @@ public class Graphics : EngineModule
             if (VulkanSdk.Instance.IsValid)
                 options.PrivateDependencies.Add("GraphicsDeviceVulkan");
             else
-                Log.WarningOnce("Building for Linux without Vulkan rendering backend (Vulkan SDK is missing)", ref _lodMissingVulkanSDK);
+                Log.WarningOnce("Building for Linux without Vulkan rendering backend (Vulkan SDK is missing)", ref _logMissingVulkanSDK);
             break;
         case TargetPlatform.PS4:
             options.PrivateDependencies.Add("GraphicsDevicePS4");
             break;
         case TargetPlatform.Android:
+            options.PrivateDependencies.Add("GraphicsDeviceVulkan");
+            break;
+        case TargetPlatform.Switch:
             options.PrivateDependencies.Add("GraphicsDeviceVulkan");
             break;
         default: throw new InvalidPlatformException(options.Platform.Target);

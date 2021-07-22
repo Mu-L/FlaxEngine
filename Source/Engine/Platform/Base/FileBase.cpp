@@ -5,11 +5,14 @@
 #include "Engine/Core/Types/String.h"
 #include "Engine/Core/Types/StringBuilder.h"
 #include "Engine/Core/Types/DataContainer.h"
+#include "Engine/Core/Log.h"
+#include "Engine/Profiler/ProfilerCPU.h"
 
 bool FileBase::ReadAllBytes(const StringView& path, byte* data, int32 length)
 {
+    PROFILE_CPU_NAMED("File::ReadAllBytes");
+    ZoneText(*path, path.Length());
     bool result = true;
-
     auto file = File::Open(path, FileMode::OpenExisting, FileAccess::Read, FileShare::All);
     if (file)
     {
@@ -22,65 +25,77 @@ bool FileBase::ReadAllBytes(const StringView& path, byte* data, int32 length)
         {
             result = false;
         }
-
         Delete(file);
     }
-
     return result;
 }
 
 bool FileBase::ReadAllBytes(const StringView& path, Array<byte>& data)
 {
+    PROFILE_CPU_NAMED("File::ReadAllBytes");
+    ZoneText(*path, path.Length());
     bool result = true;
-
     auto file = File::Open(path, FileMode::OpenExisting, FileAccess::Read, FileShare::All);
     if (file)
     {
-        uint32 size = file->GetSize();
-        data.Resize(size, false);
-        if (size > 0)
+        const uint32 size = file->GetSize();
+        if (size < MAX_int32)
         {
-            result = file->Read(data.Get(), size) != 0;
+            data.Resize(size, false);
+            if (size > 0)
+            {
+                result = file->Read(data.Get(), size) != 0;
+            }
+            else
+            {
+                data.Resize(0, false);
+                result = false;
+            }
         }
         else
         {
-            data.Resize(0, false);
-            result = false;
+            LOG(Error, "Failed to load file {0}. It's too big. Size: {1} MB", path, size / (1024 * 1024));
         }
-
         Delete(file);
     }
-
     return result;
 }
 
 bool FileBase::ReadAllBytes(const StringView& path, DataContainer<byte>& data)
 {
+    PROFILE_CPU_NAMED("File::ReadAllBytes");
+    ZoneText(*path, path.Length());
     bool result = true;
-
     auto file = File::Open(path, FileMode::OpenExisting, FileAccess::Read, FileShare::All);
     if (file)
     {
-        uint32 size = file->GetSize();
-        data.Allocate(size);
-        if (size > 0)
+        const uint32 size = file->GetSize();
+        if (size < MAX_int32)
         {
-            result = file->Read(data.Get(), size) != 0;
+            data.Allocate(size);
+            if (size > 0)
+            {
+                result = file->Read(data.Get(), size) != 0;
+            }
+            else
+            {
+                data.Release();
+                result = false;
+            }
         }
         else
         {
-            data.Release();
-            result = false;
+            LOG(Error, "Failed to load file {0}. It's too big. Size: {1} MB", path, size / (1024 * 1024));
         }
-
         Delete(file);
     }
-
     return result;
 }
 
 bool FileBase::ReadAllText(const StringView& path, String& data)
 {
+    PROFILE_CPU_NAMED("File::ReadAllText");
+    ZoneText(*path, path.Length());
     data.Clear();
 
     // Read data
@@ -162,6 +177,8 @@ bool FileBase::ReadAllText(const StringView& path, String& data)
 
 bool FileBase::ReadAllText(const StringView& path, StringAnsi& data)
 {
+    PROFILE_CPU_NAMED("File::ReadAllText");
+    ZoneText(*path, path.Length());
     data.Clear();
 
     // Read data
@@ -217,8 +234,9 @@ bool FileBase::ReadAllText(const StringView& path, StringAnsi& data)
 
 bool FileBase::WriteAllBytes(const StringView& path, const byte* data, int32 length)
 {
+    PROFILE_CPU_NAMED("File::WriteAllBytes");
+    ZoneText(*path, path.Length());
     bool result = true;
-
     auto file = File::Open(path, FileMode::CreateAlways, FileAccess::Write, FileShare::All);
     if (file)
     {
@@ -229,7 +247,6 @@ bool FileBase::WriteAllBytes(const StringView& path, const byte* data, int32 len
 
         Delete(file);
     }
-
     return result;
 }
 
@@ -250,6 +267,8 @@ bool FileBase::WriteAllText(const StringView& path, const StringBuilder& data, E
 
 bool FileBase::WriteAllText(const StringView& path, const Char* data, int32 length, Encoding encoding)
 {
+    PROFILE_CPU_NAMED("File::WriteAllText");
+    ZoneText(*path, path.Length());
     switch (encoding)
     {
     case Encoding::ANSI:

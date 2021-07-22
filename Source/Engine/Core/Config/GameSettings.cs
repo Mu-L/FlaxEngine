@@ -11,6 +11,7 @@ namespace FlaxEditor.Content.Settings
     {
         internal const string PS4PlatformSettingsTypename = "FlaxEditor.Content.Settings.PS4PlatformSettings";
         internal const string XboxScarlettPlatformSettingsTypename = "FlaxEditor.Content.Settings.XboxScarlettPlatformSettings";
+        internal const string SwitchPlatformSettingsTypename = "FlaxEditor.Content.Settings.SwitchPlatformSettings";
 
         /// <summary>
         /// The default application icon.
@@ -79,10 +80,22 @@ namespace FlaxEditor.Content.Settings
         public JsonAsset Navigation;
 
         /// <summary>
+        /// Reference to <see cref="LocalizationSettings"/> asset.
+        /// </summary>
+        [EditorOrder(1046), EditorDisplay("Other Settings"), AssetReference(typeof(LocalizationSettings), true), Tooltip("Reference to Localization Settings asset")]
+        public JsonAsset Localization;
+
+        /// <summary>
         /// Reference to <see cref="BuildSettings"/> asset.
         /// </summary>
         [EditorOrder(1050), EditorDisplay("Other Settings"), AssetReference(typeof(BuildSettings), true), Tooltip("Reference to Build Settings asset")]
         public JsonAsset GameCooking;
+
+        /// <summary>
+        /// Reference to <see cref="StreamingSettings"/> asset.
+        /// </summary>
+        [EditorOrder(1060), EditorDisplay("Other Settings"), AssetReference(typeof(StreamingSettings), true), Tooltip("Reference to Streaming Settings asset")]
+        public JsonAsset Streaming;
 
         /// <summary>
         /// The custom settings to use with a game. Can be specified by the user to define game-specific options and be used by the external plugins (used as key-value pair).
@@ -136,6 +149,14 @@ namespace FlaxEditor.Content.Settings
         /// </summary>
         [EditorOrder(2060), EditorDisplay("Platform Settings", "Android"), AssetReference(typeof(AndroidPlatformSettings), true), Tooltip("Reference to Android Platform Settings asset")]
         public JsonAsset AndroidPlatform;
+#endif
+
+#if FLAX_EDITOR || PLATFORM_SWITCH
+        /// <summary>
+        /// Reference to Switch Platform Settings asset. Used to apply configuration on Switch platform.
+        /// </summary>
+        [EditorOrder(2070), EditorDisplay("Platform Settings", "Switch"), AssetReference(SwitchPlatformSettingsTypename, true), Tooltip("Reference to Switch Platform Settings asset")]
+        public JsonAsset SwitchPlatform;
 #endif
 
         /// <summary>
@@ -210,8 +231,12 @@ namespace FlaxEditor.Content.Settings
                 return LoadAsset<GraphicsSettings>(gameSettings.Graphics) as T;
             if (type == typeof(NavigationSettings))
                 return LoadAsset<NavigationSettings>(gameSettings.Navigation) as T;
+            if (type == typeof(LocalizationSettings))
+                return LoadAsset<LocalizationSettings>(gameSettings.Localization) as T;
             if (type == typeof(BuildSettings))
                 return LoadAsset<BuildSettings>(gameSettings.GameCooking) as T;
+            if (type == typeof(StreamingSettings))
+                return LoadAsset<StreamingSettings>(gameSettings.Streaming) as T;
             if (type == typeof(InputSettings))
                 return LoadAsset<InputSettings>(gameSettings.Input) as T;
             if (type == typeof(AudioSettings))
@@ -239,6 +264,10 @@ namespace FlaxEditor.Content.Settings
 #if FLAX_EDITOR || PLATFORM_ANDROID
             if (type == typeof(AndroidPlatformSettings))
                 return LoadAsset<AndroidPlatformSettings>(gameSettings.AndroidPlatform) as T;
+#endif
+#if FLAX_EDITOR || PLATFORM_SWITCH
+            if (type.FullName == SwitchPlatformSettingsTypename)
+                return LoadAsset(gameSettings.SwitchPlatform, SwitchPlatformSettingsTypename) as T;
 #endif
 
             if (gameSettings.CustomSettings != null)
@@ -308,8 +337,12 @@ namespace FlaxEditor.Content.Settings
                 return SaveAsset(gameSettings, ref gameSettings.Graphics, obj);
             if (type == typeof(NavigationSettings))
                 return SaveAsset(gameSettings, ref gameSettings.Navigation, obj);
+            if (type == typeof(LocalizationSettings))
+                return SaveAsset(gameSettings, ref gameSettings.Localization, obj);
             if (type == typeof(BuildSettings))
                 return SaveAsset(gameSettings, ref gameSettings.GameCooking, obj);
+            if (type == typeof(StreamingSettings))
+                return SaveAsset(gameSettings, ref gameSettings.Streaming, obj);
             if (type == typeof(InputSettings))
                 return SaveAsset(gameSettings, ref gameSettings.Input, obj);
             if (type == typeof(WindowsPlatformSettings))
@@ -324,6 +357,8 @@ namespace FlaxEditor.Content.Settings
                 return SaveAsset(gameSettings, ref gameSettings.XboxScarlettPlatform, obj);
             if (type == typeof(AndroidPlatformSettings))
                 return SaveAsset(gameSettings, ref gameSettings.AndroidPlatform, obj);
+            if (type.FullName == SwitchPlatformSettingsTypename)
+                return SaveAsset(gameSettings, ref gameSettings.SwitchPlatform, obj);
             if (type == typeof(AudioSettings))
                 return SaveAsset(gameSettings, ref gameSettings.Audio, obj);
 

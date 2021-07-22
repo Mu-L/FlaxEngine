@@ -56,18 +56,8 @@ public:
     }
 
     /// <summary>
-    /// Gets amount of the level of details in the model
-    /// </summary>
-    /// <returns>Amount of the level of details in the model</returns>
-    FORCE_INLINE int32 GetLODsCount() const
-    {
-        return LODs.Count();
-    }
-
-    /// <summary>
     /// Gets the amount of loaded model LODs.
     /// </summary>
-    /// <returns>Loaded LODs count</returns>
     API_PROPERTY() FORCE_INLINE int32 GetLoadedLODs() const
     {
         return _loadedLODs;
@@ -96,7 +86,6 @@ public:
     /// <summary>
     /// Gets index of the highest resident LOD (may be equal to LODs.Count if no LOD has been uploaded). Note: LOD=0 is the highest (top quality)
     /// </summary>
-    /// <returns>LOD index</returns>
     FORCE_INLINE int32 HighestResidentLODIndex() const
     {
         return GetLODsCount() - _loadedLODs;
@@ -105,7 +94,6 @@ public:
     /// <summary>
     /// Determines whether any LOD has been initialized.
     /// </summary>
-    /// <returns>True if any LOD has been initialized, otherwise false.</returns>
     FORCE_INLINE bool HasAnyLODInitialized() const
     {
         return LODs.HasItems() && LODs.Last().HasAnyMeshInitialized();
@@ -114,7 +102,6 @@ public:
     /// <summary>
     /// Determines whether this model can be rendered.
     /// </summary>
-    /// <returns>True if can render that model, otherwise false.</returns>
     FORCE_INLINE bool CanBeRendered() const
     {
         return _loadedLODs > 0;
@@ -237,18 +224,11 @@ public:
 
     // [ModelBase]
     void SetupMaterialSlots(int32 slotsCount) override;
+    int32 GetLODsCount() const override;
+    void GetMeshes(Array<MeshBase*>& meshes, int32 lodIndex = 0) override;
     void InitAsVirtual() override;
 #if USE_EDITOR
-    void GetReferences(Array<Guid>& output) const override
-    {
-        // Base
-        BinaryAsset::GetReferences(output);
-
-        for (int32 i = 0; i < MaterialSlots.Count(); i++)
-        {
-            output.Add(MaterialSlots[i].Material.GetID());
-        }
-    }
+    void GetReferences(Array<Guid>& output) const override;
 #endif
 
     // [StreamableResource]

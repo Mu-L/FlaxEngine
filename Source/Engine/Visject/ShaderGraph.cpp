@@ -767,6 +767,7 @@ void ShaderGenerator::ProcessGroupTools(Box* box, Node* node, Value& value)
         PLATFORM_CASE(6, "PLATFORM_PS4");
         PLATFORM_CASE(7, "PLATFORM_XBOX_SCARLETT");
         PLATFORM_CASE(8, "PLATFORM_ANDROID");
+        PLATFORM_CASE(9, "PLATFORM_SWITCH");
 #undef PLATFORM_CASE
         break;
     }
@@ -1268,6 +1269,30 @@ SerializedMaterialParam ShaderGenerator::findOrAddSceneTexture(MaterialSceneText
     param.Name = TEXT("Scene Texture");
     param.ShaderName = getParamName(_parameters.Count());
     param.AsInteger = asInt;
+    param.ID = Guid(_parameters.Count(), 0, 0, 3); // Assign temporary id
+    return param;
+}
+
+SerializedMaterialParam& ShaderGenerator::findOrAddTextureGroupSampler(int32 index)
+{
+    // Find
+    for (int32 i = 0; i < _parameters.Count(); i++)
+    {
+        SerializedMaterialParam& param = _parameters[i];
+        if (!param.IsPublic && param.Type == MaterialParameterType::TextureGroupSampler && param.AsInteger == index)
+        {
+            return param;
+        }
+    }
+
+    // Create
+    SerializedMaterialParam& param = _parameters.AddOne();
+    param.Type = MaterialParameterType::TextureGroupSampler;
+    param.IsPublic = false;
+    param.Override = true;
+    param.Name = TEXT("Texture Group Sampler");
+    param.ShaderName = getParamName(_parameters.Count());
+    param.AsInteger = index;
     param.ID = Guid(_parameters.Count(), 0, 0, 3); // Assign temporary id
     return param;
 }

@@ -299,7 +299,8 @@ public:
     static void Prefetch(void const* ptr) = delete;
 
 #if COMPILE_WITH_PROFILER
-    static void TrackAllocation(uint64 size);
+    static void OnMemoryAlloc(void* ptr, uint64 size);
+    static void OnMemoryFree(void* ptr);
 #endif
 
     /// <summary>
@@ -322,13 +323,13 @@ public:
     /// <param name="numPages">The number of pages to allocate.</param>
     /// <param name="pageSize">The size of single page. Use Platform::GetCPUInfo().PageSize or provide compatible, custom size.</param>
     /// <returns>The pointer to the allocated pages in memory.</returns>
-    static void* AllocatePages(uint64 numPages, uint64 pageSize) = delete;
+    static void* AllocatePages(uint64 numPages, uint64 pageSize);
 
     /// <summary>
     /// Frees allocated pages memory block.
     /// </summary>
     /// <param name="ptr">The pointer to the pages to deallocate.</param>
-    static void FreePages(void* ptr) = delete;
+    static void FreePages(void* ptr);
 
 public:
 
@@ -616,10 +617,7 @@ public:
     /// <summary>
     /// Returns true if app is paused. Engine ticking (update/physics/drawing) is disabled in that state, only platform is updated until app end or resume.
     /// </summary>
-    static bool GetIsPaused()
-    {
-        return false;
-    }
+    static bool GetIsPaused();
 
     /// <summary>
     /// Creates the unique identifier.
@@ -707,7 +705,7 @@ public:
     /// Gets the process environment variables (pairs of key and value).
     /// </summary>
     /// <param name="result">The result.</param>
-    static void GetEnvironmentVariables(Dictionary<String, String>& result);
+    static void GetEnvironmentVariables(Dictionary<String, String, HeapAllocation>& result);
 
     /// <summary>
     /// Gets the environment variable value.
@@ -755,7 +753,7 @@ public:
     /// <param name="environment">The process environment variables. If null the current process environment is used.</param>
     /// <param name="hiddenWindow">True if start process with hidden window.</param>
     /// <returns>Retrieves the termination status of the specified process. Valid only if processed ended.</returns>
-    API_FUNCTION() static int32 RunProcess(const StringView& cmdLine, const StringView& workingDir, const Dictionary<String, String>& environment, bool hiddenWindow = true);
+    API_FUNCTION() static int32 RunProcess(const StringView& cmdLine, const StringView& workingDir, const Dictionary<String, String, HeapAllocation>& environment, bool hiddenWindow = true);
 
     /// <summary>
     /// Creates the window.
