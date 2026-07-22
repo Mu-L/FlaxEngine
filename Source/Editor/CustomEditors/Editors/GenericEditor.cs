@@ -707,10 +707,10 @@ namespace FlaxEditor.CustomEditors.Editors
             if (!HasDifferentTypes)
             {
                 var value = Values[0];
+                var type = Values.Type;
                 if (value == null)
                 {
                     // Check if it's an object type that can be created in editor
-                    var type = Values.Type;
                     if (type != ScriptMemberInfo.Null)
                     {
                         ScriptType[] types = null;
@@ -753,6 +753,12 @@ namespace FlaxEditor.CustomEditors.Editors
 
                     layout.Label("<null>");
                     return;
+                }
+                if (!type.IsArray && !type.IsStructure && !type.IsScriptingObject && (type.IsAbstract || type.IsInterface) && value.GetType() != type.Type && layout is GroupElement group)
+                {
+                    // Add button to unset the value to null (eg. to edit it to different type)
+                    var button = group.AddHeaderButton("Reset value to null", 0, FlaxEngine.GUI.Style.Current.Cross);
+                    button.Clicked += (_, _) => SetValue(null);
                 }
 
                 items = GetItemsForType(TypeUtils.GetObjectType(value));
