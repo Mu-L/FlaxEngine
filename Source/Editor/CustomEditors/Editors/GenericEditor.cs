@@ -711,21 +711,44 @@ namespace FlaxEditor.CustomEditors.Editors
                 {
                     // Check if it's an object type that can be created in editor
                     var type = Values.Type;
-                    if (type != ScriptMemberInfo.Null && type.CanCreateInstance)
+                    if (type != ScriptMemberInfo.Null)
                     {
-                        layout = layout.Space(20);
-
-                        const float ButtonSize = 14.0f;
-                        var button = new Button
+                        ScriptType[] types = null;
+                        if (type.IsAbstract || type.IsInterface)
                         {
-                            Text = "+",
-                            TooltipText = "Create a new instance of the object",
-                            Size = new Float2(ButtonSize, ButtonSize),
-                            AnchorPreset = AnchorPresets.MiddleRight,
-                            Parent = layout.ContainerControl,
-                            Location = new Float2(layout.ContainerControl.Width - ButtonSize - 4, (layout.ContainerControl.Height - ButtonSize) * 0.5f),
-                        };
-                        button.Clicked += () => SetValue(Values.Type.CreateInstance());
+                            // Show picker with all types that implement specific class/interface but are not abstract
+                            types = Editor.Instance.CodeEditing.All.Get().Where(x => !x.IsAbstract && x.CanCreateInstance && type.IsAssignableFrom(x)).ToArray();
+                        }
+                        else if (type.CanCreateInstance)
+                        {
+                            types = [type];
+                        }
+
+                        if (types != null && types.Length != 0)
+                        {
+                            layout = layout.Space(20);
+
+                            const float ButtonSize = 14.0f;
+                            var button = new Button
+                            {
+                                Text = "+",
+                                TooltipText = "Create a new instance of the object",
+                                Size = new Float2(ButtonSize, ButtonSize),
+                                AnchorPreset = AnchorPresets.MiddleRight,
+                                Parent = layout.ContainerControl,
+                                Location = new Float2(layout.ContainerControl.Width - ButtonSize - 4, (layout.ContainerControl.Height - ButtonSize) * 0.5f),
+                            };
+                            if (types.Length == 1)
+                            {
+                                // Single type
+                                button.Clicked += () => SetValue(Values.Type.CreateInstance());
+                            }
+                            else
+                            {
+                                // Picker
+                                button.Clicked += () => FlaxEditor.GUI.TypeSearchPopup.Show(button, new Float2(0, button.Height), types, scriptType => { SetValue(scriptType.CreateInstance()); });
+                            }
+                        }
                     }
 
                     layout.Label("<null>");
